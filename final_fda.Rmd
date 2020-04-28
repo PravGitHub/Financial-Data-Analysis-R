@@ -114,12 +114,24 @@ for (i in 2:nrow(res)){
 ```{r}
 # A table indicating how much money you would have at the end of each year by following strategy 1 and strategy 2. 
 res[,c(1,10,11)]
+
+res$strategy1_yearly_returns <- c(0)
+res$strategy2_yearly_returns <- c(0)
+```
+
+```{r}
+for(i in 2:nrow(res)){
+  res$strategy1_yearly_returns[i] = res$strategy1_total[i] - res$strategy1_total[i-1] - 12000.0
+  
+  res$strategy2_yearly_returns[i] = res$strategy2_total[i] - res$strategy2_total[i-1] - 12000.0
+  
+}
 ```
 
 ```{r}
 # A plot indicating the returns of both strategies over the 30 year period. 
 # Incomplete
-ggplot(res,mapping = aes(x = year,group=1))+geom_line(aes(y=strategy1_total),color="green")+geom_line(aes(y=strategy2_total),color="red")
+ggplot(res,mapping = aes(x = year,group=1))+geom_line(aes(y=strategy1_yearly_returns),color="green")+geom_line(aes(y=strategy2_yearly_returns),color="red")
 ```
 
 ```{r}
