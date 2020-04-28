@@ -1,0 +1,130 @@
+
+
+```{r}
+require(quantmod) 
+require(tidyquant)
+require(tidyverse)
+require(dplyr)
+require(tidyr)
+```
+```{r}
+spy <- tq_get("SPY",get = "stock.prices", from = "1993-12-01", to = "2019-12-31")
+head(spy)
+tail(spy)
+```
+
+```{r}
+# NOT EXECUTED
+#stock_returns <- spy %>% tq_transmute(select=adjusted, mutate_fun = periodReturn, period="monthly",col_rename = "Ra")
+#stock_returns
+
+```
+
+
+```{r}
+sma <- spy %>% tq_transmute(select=adjusted, mutate_fun = SMA, period="monthly",col_rename = "sma")
+head(sma)
+tail(sma)
+```
+
+```{r}
+s <-separate(sma,col = date,into = c("year","month","day"), sep="-")
+```
+
+```{r}
+sma_final <- s %>% group_by(year,month) %>% summarise(day[1],sma[1])
+```
+
+```{r}
+colnames(sma_final)[colnames(sma_final) %in% c("sma[1]","day[1]")] <- c("day","sma")
+```
+
+```{r}
+sma_final$date <- paste(sma_final$year,sma_final$month,sma_final$day,sep="-")
+```
+```{r}
+sma_final$date<- as.Date(sma_final$date)
+```
+
+```{r}
+final <- left_join(sma_final,spy[,c(2,8)])
+```
+
+```{r}
+# Initializing the columns 
+final$strategy1<- c(0)
+final$strategy2_stocks <- c(0)
+final$strategy2_acc <- c(0)
+```
+
+
+
+```{r}
+for(i in 2:nrow(final)){
+  final$strategy1[i] <- final$strategy1[i-1]+(1000/final$adjusted[i])
+  
+  if(final$adjusted[i] > final$sma[i]){ # Buy scenario
+    if(final$strategy2_stocks[i-1] != 0.0){ # Buy more stocks 
+      final$strategy2_stocks[i] <- final$strategy2_stocks[i-1]+(1000.0/final$adjusted[i])
+    }
+    else{ # Move from account to stocks
+      final$strategy2_stocks[i] <- (final$strategy2_acc[i-1]+1000.0) / final$adjusted[i]
+    }
+  }
+  else{ # Sell scenario
+    if(final$strategy2_stocks[i-1]!= 0.0){ # Move from stocks to account
+      final$strategy2_acc[i] <- (final$strategy2_stocks[i-1]*final$adjusted[i]) + 1000.0
+    }
+    else{ # keep money in account and add $1000
+      final$strategy2_acc[i] <- final$strategy2_acc[i-1] + 1000.0
+    }
+  }
+  
+}
+```
+
+```{r}
+dec31_stock_price <- spy %>% separate(col = date,into = c("year","month","day"), sep="-") %>% filter(month=="12") %>% group_by(year) %>% summarise(tail(adjusted,n=1))
+```
+
+```{r}
+colnames(dec31_stock_price)<-c("year","adjusted")
+```
+
+
+```{r}
+res <- final %>% filter(month == "12")
+res$strategy1_total <- c(0)
+res$strategy2_total <- c(0)
+```
+
+```{r}
+for (i in 2:nrow(res)){
+  res$strategy1_total[i] <- res$strategy1[i] * dec31_stock_price$adjusted[i]
+  
+  if(res$strategy2_acc[i] != 0.0){
+    res$strategy2_total[i] = res$strategy2_acc[i]
+  }
+  else{
+    res$strategy2_total[i] = res$strategy2_stocks[i] * dec31_stock_price$adjusted[i]
+  }
+}
+```
+
+```{r}
+# A table indicating how much money you would have at the end of each year by following strategy 1 and strategy 2. 
+res[,c(1,10,11)]
+```
+
+```{r}
+# A plot indicating the returns of both strategies over the 30 year period. 
+# Incomplete
+ggplot(res,mapping = aes(x = year,group=1))+geom_line(aes(y=strategy1_total),color="green")+geom_line(aes(y=strategy2_total),color="red")
+```
+
+```{r}
+# The total money accumulated at the end of 30 years using the di???erent strategies. 
+tail(res,n=1)[,c(1,10,11)]
+```
+
+
